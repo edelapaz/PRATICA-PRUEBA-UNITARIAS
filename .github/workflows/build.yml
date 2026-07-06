@@ -1,147 +1,98 @@
-name: .NET 10 CI con SonarCloud
-
+name: .NET CI con SonarCloud
 on:
   push:
-    branches: ["main", "master", "dev_edelapaz"]
+    branches: ["main", "dev_edelapaz"]
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main"]
   workflow_dispatch:
-
-env:
-  ACTIONS_NODE_JS_FORCED_VERSION: "node24"
-  NODE_NO_WARNINGS: 1
-  DOTNET_VERSION: "10.0.x"
-  SOLUTION_PATH: "PruebasUnitarias.slnx"
-  TEST_RESULTS_DIR: "TestResults"
-
 jobs:
-  build-test-sonar:
-    runs-on: windows-latest
-
+  build-test-analyze:
+    runs-on: ubuntu-latest
     env:
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
       SONAR_ORG: ${{ secrets.SONAR_ORG }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
     steps:
-      - name: Checkout
+      - name: Checkout del código
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Configurar .NET SDK
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Configurar SonarCloud
-        id: sonar
-        shell: pwsh
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
-            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            Write-Host "SONAR_TOKEN no está configurado. Se omite análisis de SonarCloud."
-            exit 0
-          }
-
-          $projectKey = if ([string]::IsNullOrWhiteSpace($env:SONAR_PROJECT_KEY)) { "edelapaz_PRATICA-PRUEBA-UNITARIAS" } else { $env:SONAR_PROJECT_KEY }
-          $org = if ([string]::IsNullOrWhiteSpace($env:SONAR_ORG)) { "edelapaz" } else { $env:SONAR_ORG }
-
-          "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "SONAR_PROJECT_KEY=$projectKey" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "SONAR_ORG=$org" | Out-File -FilePath $env:GITHUB_ENV -Append
-
+          dotnet-version: "10.0.x"
       - name: Setup Java 17
-        if: ${{ steps.sonar.outputs.enabled == 'true' }}
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
-
       - name: Cache SonarCloud packages
-        if: ${{ steps.sonar.outputs.enabled == 'true' }}
         uses: actions/cache@v4
         with:
-          path: ~\.sonar\cache
+          path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: |
             ${{ runner.os }}-sonar
-
       - name: Instalar SonarScanner
-        if: ${{ steps.sonar.outputs.enabled == 'true' }}
-        shell: pwsh
         run: |
           dotnet tool update --global dotnet-sonarscanner
-          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append
-
-      - name: Restaurar dependencias
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
-
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+      - name: Validar variables de SonarCloud
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "Falta SONAR_TOKEN en los secrets del repositorio."
+            exit 1
+          fi
+          echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
+          echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
       - name: Iniciar análisis SonarCloud
-        if: ${{ steps.sonar.outputs.enabled == 'true' }}
-        shell: pwsh
         run: |
-          dotnet sonarscanner begin `
-            /k:"$env:SONAR_PROJECT_KEY" `
-            /o:"$env:SONAR_ORG" `
-            /d:sonar.token="$env:SONAR_TOKEN" `
-            /d:sonar.host.url="https://sonarcloud.io" `
-            /d:sonar.verbose=true `
-            /d:sonar.qualitygate.wait=true `
-            /d:sonar.cs.opencover.reportsPaths="${{ env.TEST_RESULTS_DIR }}/coverage.opencover.xml" `
-            /d:sonar.cs.vstest.reportsPaths="${{ env.TEST_RESULTS_DIR }}/test-results.trx"
-
+          dotnet sonarscanner begin \
+          /k:"$SONAR_PROJECT_KEY" \
+          /o:"$SONAR_ORG" \
+          /d:sonar.token="$SONAR_TOKEN" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.qualitygate.wait=true \
+          /d:sonar.verbose=true \
+          /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage.opencover.xml" \
+          /d:sonar.cs.vstest.reportsPaths="./TestResults/test-results.trx"
+      - name: Restaurar dependencias
+        run: dotnet restore ./PruebasUnitarias.slnx
       - name: Compilar solución
-        run: dotnet build ${{ env.SOLUTION_PATH }} -c Release --no-restore
-
+        run: dotnet build ./PruebasUnitarias.slnx -c Release --no-restore
       - name: Ejecutar pruebas y generar cobertura
-        shell: pwsh
         run: |
-          dotnet test ${{ env.SOLUTION_PATH }} -c Release --no-build `
-            --logger "trx;LogFileName=test-results.trx" `
-            --results-directory "${{ env.TEST_RESULTS_DIR }}" `
-            --collect:"XPlat Code Coverage" `
-            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
-
-      - name: Normalizar reportes de cobertura
-        shell: pwsh
+          dotnet test ./PruebasUnitarias.slnx -c Release --no-build \
+          --logger "trx;LogFileName=test-results.trx" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+      - name: Verificar reporte de cobertura
         run: |
-          $resultsDir = Resolve-Path "${{ env.TEST_RESULTS_DIR }}"
-
+          echo "Archivos de resultados encontrados:"
+          find ./TestResults -type f \( -name "coverage.opencover.xml" -o -name "*.trx" \) -print
           COVERAGE_FILE=$(find ./TestResults -type f -name "coverage.opencover.xml" | head -n 1)
           if [ -z "$COVERAGE_FILE" ]; then
             echo "No se encontró coverage.opencover.xml."
             exit 1
           fi
           echo "Reporte de cobertura detectado en: $COVERAGE_FILE"
-           TARGET_COVERAGE="./TestResults/coverage.opencover.xml"
-           if [ "${COVERAGE_FILE#./}" != "${TARGET_COVERAGE#./}" ]; then
-             cp "$COVERAGE_FILE" "$TARGET_COVERAGE"
-           fi
-
+          cp "$COVERAGE_FILE" ./TestResults/coverage.opencover.xml
           TRX_FILE=$(find ./TestResults -type f -name "*.trx" | head -n 1)
           if [ -n "$TRX_FILE" ]; then
-             TARGET_TRX="./TestResults/test-results.trx"
-             if [ "${TRX_FILE#./}" != "${TARGET_TRX#./}" ]; then
-               cp "$TRX_FILE" "$TARGET_TRX"
-             fi
+            cp "$TRX_FILE" ./TestResults/test-results.trx
             echo "Reporte TRX detectado en: $TRX_FILE"
           else
             echo "No se encontró archivo TRX."
           fi
-
       - name: Finalizar análisis SonarCloud
-        if: ${{ steps.sonar.outputs.enabled == 'true' }}
-        shell: pwsh
         run: |
-          dotnet sonarscanner end `
-            /d:sonar.token="$env:SONAR_TOKEN"
-
-      - name: Publicar artefactos de pruebas y cobertura
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+      - name: Publicar reporte de cobertura
         uses: actions/upload-artifact@v4
         with:
-          name: test-and-coverage-results
+          name: coverage-results
           path: |
-            ${{ env.TEST_RESULTS_DIR }}/**/coverage.opencover.xml
-            ${{ env.TEST_RESULTS_DIR }}/**/*.trx
+            TestResults/**/coverage.opencover.xml
+            TestResults/**/*.trx
           if-no-files-found: warn
