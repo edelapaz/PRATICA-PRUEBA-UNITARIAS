@@ -1,53 +1,65 @@
-name: SonarQube
+name: .NET CI con SonarCloud
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
   pull_request:
-    types: [opened, synchronize, reopened]
+    branches: ["main"]
+
 jobs:
-  build:
-    name: Build and analyze
-    runs-on: windows-latest
+  build-test-analyze:
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Set up JDK 17
-        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
         with:
-          java-version: 17
-          distribution: "zulu" # Alternative distribution options are available.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-      - name: Cache SonarQube Cloud packages
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+          dotnet-version: "10.0.x"
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          path: ~\sonar\cache
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
-      - name: Cache SonarQube Cloud scanner
-        id: cache-sonar-scanner
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ${{ runner.temp }}\scanner
-          key: ${{ runner.os }}-sonar-scanner
-          restore-keys: ${{ runner.os }}-sonar-scanner
-      - name: Install SonarQube Cloud scanner
-        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
-        shell: powershell
+
+      - name: Instalar SonarScanner
         run: |
-          New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
-          dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
-      - name: Build and analyze
+          dotnet tool update --global dotnet-sonarscanner
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Iniciar analisis de SonarCloud
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        shell: powershell
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"edelapaz_PRATICA-PRUEBA-UNITARIAS" /o:"edelapaz" /d:sonar.token="$env:SONAR_TOKEN" /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
-          dotnet build
-          dotnet test .\PruebasUnitarias.slnx -c Release --collect:"XPlat Code Coverage" --results-directory .\TestResults -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+          dotnet sonarscanner begin /k:"edelapaz_PRATICA-PRUEBA-UNITARIAS" /o:"edelapaz" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
+
+      - name: Restaurar dependencias
+        run: dotnet restore ./PruebasUnitarias.slnx
+
+      - name: Compilar solucion
+        run: dotnet build ./PruebasUnitarias.slnx -c Release --no-restore
+
+      - name: Ejecutar pruebas y generar cobertura
+        run: dotnet test ./PruebasUnitarias.slnx -c Release --no-build --collect:"XPlat Code Coverage" --results-directory ./TestResults -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: Finalizar analisis y enviar a SonarCloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+
+      - name: Publicar reporte de cobertura
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-results
           path: TestResults/**/coverage.opencover.xml
