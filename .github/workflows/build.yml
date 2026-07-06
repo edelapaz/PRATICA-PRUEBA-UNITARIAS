@@ -80,12 +80,12 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage.opencover.xml" \
           /d:sonar.cs.vstest.reportsPaths="./TestResults/test-results.trx"
       - name: Restaurar dependencias
-        run: dotnet restore ./PruebasUnitarias.slnx
+        run: dotnet restore ./PruebasUnitarias.CI.sln
       - name: Compilar solución
-        run: dotnet build ./PruebasUnitarias.slnx -c Release --no-restore
+        run: dotnet build ./PruebasUnitarias.CI.sln -c Release --no-restore
       - name: Ejecutar pruebas y generar cobertura
         run: |
-          dotnet test ./PruebasUnitarias.slnx -c Release --no-build \
+          dotnet test ./PruebasUnitarias.CI.sln -c Release --no-build \
           --logger "trx;LogFileName=test-results.trx" \
           --collect:"XPlat Code Coverage" \
           --results-directory ./TestResults \
