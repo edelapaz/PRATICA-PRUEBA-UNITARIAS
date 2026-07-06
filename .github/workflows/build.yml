@@ -22,11 +22,13 @@ jobs:
         with:
           dotnet-version: "10.0.x"
       - name: Setup Java 17
+        if: env.SONAR_TOKEN != ''
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
       - name: Cache SonarCloud packages
+        if: env.SONAR_TOKEN != ''
         uses: actions/cache@v4
         with:
           path: ~/.sonar/cache
@@ -34,18 +36,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sonar
       - name: Instalar SonarScanner
+        if: env.SONAR_TOKEN != ''
         run: |
           dotnet tool update --global dotnet-sonarscanner
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Validar variables de SonarCloud
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
-            echo "Falta SONAR_TOKEN en los secrets del repositorio."
-            exit 1
+            echo "SONAR_TOKEN no configurado. Se omiten pasos de SonarCloud en este run."
+            exit 0
           fi
           echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
           echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
       - name: Iniciar análisis SonarCloud
+        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner begin \
           /k:"$SONAR_PROJECT_KEY" \
@@ -77,15 +81,22 @@ jobs:
             exit 1
           fi
           echo "Reporte de cobertura detectado en: $COVERAGE_FILE"
-          cp "$COVERAGE_FILE" ./TestResults/coverage.opencover.xml
+          TARGET_COVERAGE="./TestResults/coverage.opencover.xml"
+          if [ "$COVERAGE_FILE" != "$TARGET_COVERAGE" ] && [ "$COVERAGE_FILE" != "TestResults/coverage.opencover.xml" ]; then
+            cp "$COVERAGE_FILE" "$TARGET_COVERAGE"
+          fi
           TRX_FILE=$(find ./TestResults -type f -name "*.trx" | head -n 1)
           if [ -n "$TRX_FILE" ]; then
-            cp "$TRX_FILE" ./TestResults/test-results.trx
+            TARGET_TRX="./TestResults/test-results.trx"
+            if [ "$TRX_FILE" != "$TARGET_TRX" ] && [ "$TRX_FILE" != "TestResults/test-results.trx" ]; then
+              cp "$TRX_FILE" "$TARGET_TRX"
+            fi
             echo "Reporte TRX detectado en: $TRX_FILE"
           else
             echo "No se encontró archivo TRX."
           fi
       - name: Finalizar análisis SonarCloud
+        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
       - name: Publicar reporte de cobertura
