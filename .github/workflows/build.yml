@@ -1,15 +1,22 @@
-name: .NET CI con SonarCloud
+name: .NET 10 CI con SonarCloud
 
 on:
   push:
-    branches: ["main", "dev_edelapaz"]
+    branches: ["main", "master", "dev_edelapaz"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "master"]
   workflow_dispatch:
 
+env:
+  ACTIONS_NODE_JS_FORCED_VERSION: "node24"
+  NODE_NO_WARNINGS: 1
+  DOTNET_VERSION: "10.0.x"
+  SOLUTION_PATH: "PruebasUnitarias.slnx"
+  TEST_RESULTS_DIR: "TestResults"
+
 jobs:
-  build-test-analyze:
-    runs-on: ubuntu-latest
+  build-test-sonar:
+    runs-on: windows-latest
 
     env:
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
@@ -17,28 +24,32 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     steps:
-      - name: Checkout del código
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup .NET
+      - name: Configurar .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Configure SonarCloud
+      - name: Configurar SonarCloud
         id: sonar
+        shell: pwsh
         run: |
-          if [ -z "$SONAR_TOKEN" ]; then
-            echo "enabled=false" >> $GITHUB_OUTPUT
-            echo "Skipping SonarCloud because SONAR_TOKEN is not configured."
+          if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
+            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "SONAR_TOKEN no está configurado. Se omite análisis de SonarCloud."
             exit 0
-          fi
+          }
 
-          echo "enabled=true" >> $GITHUB_OUTPUT
-          echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
-          echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
+          $projectKey = if ([string]::IsNullOrWhiteSpace($env:SONAR_PROJECT_KEY)) { "edelapaz_PRATICA-PRUEBA-UNITARIAS" } else { $env:SONAR_PROJECT_KEY }
+          $org = if ([string]::IsNullOrWhiteSpace($env:SONAR_ORG)) { "edelapaz" } else { $env:SONAR_ORG }
+
+          "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "SONAR_PROJECT_KEY=$projectKey" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SONAR_ORG=$org" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Setup Java 17
         if: ${{ steps.sonar.outputs.enabled == 'true' }}
@@ -51,79 +62,93 @@ jobs:
         if: ${{ steps.sonar.outputs.enabled == 'true' }}
         uses: actions/cache@v4
         with:
-          path: ~/.sonar/cache
+          path: ~\.sonar\cache
           key: ${{ runner.os }}-sonar
           restore-keys: |
             ${{ runner.os }}-sonar
 
       - name: Instalar SonarScanner
         if: ${{ steps.sonar.outputs.enabled == 'true' }}
+        shell: pwsh
         run: |
           dotnet tool update --global dotnet-sonarscanner
-          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Restaurar dependencias
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
 
       - name: Iniciar análisis SonarCloud
         if: ${{ steps.sonar.outputs.enabled == 'true' }}
+        shell: pwsh
         run: |
-          dotnet sonarscanner begin \
-          /k:"$SONAR_PROJECT_KEY" \
-          /o:"$SONAR_ORG" \
-          /d:sonar.token="$SONAR_TOKEN" \
-          /d:sonar.host.url="https://sonarcloud.io" \
-          /d:sonar.verbose=true \
-          /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage.opencover.xml" \
-          /d:sonar.cs.vstest.reportsPaths="./TestResults/test-results.trx"
-
-      - name: Restaurar dependencias
-        run: dotnet restore ./PruebasUnitarias.slnx
+          dotnet sonarscanner begin `
+            /k:"$env:SONAR_PROJECT_KEY" `
+            /o:"$env:SONAR_ORG" `
+            /d:sonar.token="$env:SONAR_TOKEN" `
+            /d:sonar.host.url="https://sonarcloud.io" `
+            /d:sonar.verbose=true `
+            /d:sonar.qualitygate.wait=true `
+            /d:sonar.cs.opencover.reportsPaths="${{ env.TEST_RESULTS_DIR }}/coverage.opencover.xml" `
+            /d:sonar.cs.vstest.reportsPaths="${{ env.TEST_RESULTS_DIR }}/test-results.trx"
 
       - name: Compilar solución
-        run: dotnet build ./PruebasUnitarias.slnx -c Release --no-restore
+        run: dotnet build ${{ env.SOLUTION_PATH }} -c Release --no-restore
 
       - name: Ejecutar pruebas y generar cobertura
+        shell: pwsh
         run: |
-          dotnet test ./PruebasUnitarias.slnx -c Release --no-build \
-          --logger "trx;LogFileName=test-results.trx" \
-          --collect:"XPlat Code Coverage" \
-          --results-directory ./TestResults \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+          dotnet test ${{ env.SOLUTION_PATH }} -c Release --no-build `
+            --logger "trx;LogFileName=test-results.trx" `
+            --results-directory "${{ env.TEST_RESULTS_DIR }}" `
+            --collect:"XPlat Code Coverage" `
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
-      - name: Verificar reporte de cobertura
+      - name: Normalizar reportes de cobertura
+        shell: pwsh
         run: |
-          echo "Archivos de resultados encontrados:"
-          find ./TestResults -type f \( -name "coverage.opencover.xml" -o -name "*.trx" \) -print
+          $resultsDir = Resolve-Path "${{ env.TEST_RESULTS_DIR }}"
 
-          COVERAGE_FILE=$(find ./TestResults -type f -name "coverage.opencover.xml" | head -n 1)
-          if [ -z "$COVERAGE_FILE" ]; then
-            echo "No se encontró coverage.opencover.xml."
-            exit 1
-          fi
-          echo "Reporte de cobertura detectado en: $COVERAGE_FILE"
-          TARGET_COVERAGE="./TestResults/coverage.opencover.xml"
-          if [ "$COVERAGE_FILE" != "$TARGET_COVERAGE" ] && [ "$COVERAGE_FILE" != "TestResults/coverage.opencover.xml" ]; then
-            cp "$COVERAGE_FILE" "$TARGET_COVERAGE"
-          fi
+          $coverageFile = Get-ChildItem -Path $resultsDir -Recurse -Filter "coverage.opencover.xml" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
 
-          TRX_FILE=$(find ./TestResults -type f -name "*.trx" | head -n 1)
-          if [ -n "$TRX_FILE" ]; then
-            TARGET_TRX="./TestResults/test-results.trx"
-            if [ "$TRX_FILE" != "$TARGET_TRX" ] && [ "$TRX_FILE" != "TestResults/test-results.trx" ]; then
-              cp "$TRX_FILE" "$TARGET_TRX"
-            fi
-            echo "Reporte TRX detectado en: $TRX_FILE"
-          else
-            echo "No se encontró archivo TRX."
-          fi
+          if (-not $coverageFile) {
+            throw "No se encontró coverage.opencover.xml en $resultsDir"
+          }
+
+          $targetCoverage = Join-Path $resultsDir "coverage.opencover.xml"
+          if ($coverageFile.FullName -ne $targetCoverage) {
+            Copy-Item $coverageFile.FullName $targetCoverage -Force
+          }
+
+          $trxFile = Get-ChildItem -Path $resultsDir -Recurse -Filter "*.trx" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if ($trxFile) {
+            $targetTrx = Join-Path $resultsDir "test-results.trx"
+            if ($trxFile.FullName -ne $targetTrx) {
+              Copy-Item $trxFile.FullName $targetTrx -Force
+            }
+          }
+
+          Write-Host "Reporte de cobertura: $targetCoverage"
+          if ($trxFile) {
+            Write-Host "Reporte TRX: $(Join-Path $resultsDir 'test-results.trx')"
+          }
 
       - name: Finalizar análisis SonarCloud
+        if: ${{ steps.sonar.outputs.enabled == 'true' }}
+        shell: pwsh
         run: |
-          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+          dotnet sonarscanner end `
+            /d:sonar.token="$env:SONAR_TOKEN"
 
-      - name: Publicar reporte de cobertura
+      - name: Publicar artefactos de pruebas y cobertura
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-results
+          name: test-and-coverage-results
           path: |
-            TestResults/**/coverage.opencover.xml
-            TestResults/**/*.trx
+            ${{ env.TEST_RESULTS_DIR }}/**/coverage.opencover.xml
+            ${{ env.TEST_RESULTS_DIR }}/**/*.trx
           if-no-files-found: warn
