@@ -48,20 +48,13 @@ jobs:
 
       - name: Validar variables de SonarCloud
         run: |
-          if [ -z "$SONAR_PROJECT_KEY" ]; then
-            echo "Falta SONAR_PROJECT_KEY en los secrets del repositorio."
-            exit 1
-          fi
-
-          if [ -z "$SONAR_ORG" ]; then
-            echo "Falta SONAR_ORG en los secrets del repositorio."
-            exit 1
-          fi
-
           if [ -z "$SONAR_TOKEN" ]; then
             echo "Falta SONAR_TOKEN en los secrets del repositorio."
             exit 1
           fi
+
+          echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
+          echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
 
       - name: Iniciar análisis SonarCloud
         run: |
