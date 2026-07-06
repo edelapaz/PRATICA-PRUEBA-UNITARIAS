@@ -51,7 +51,8 @@ jobs:
           /o:"edelapaz" \
           /d:sonar.token="$SONAR_TOKEN" \
           /d:sonar.host.url="https://sonarcloud.io" \
-          /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
+          /d:sonar.cs.opencover.reportsPaths="./TestResults/**/coverage.opencover.xml" \
+          /d:sonar.cs.vstest.reportsPaths="./TestResults/**/*.trx"
 
       - name: Restaurar dependencias
         run: dotnet restore ./PruebasUnitarias.slnx
@@ -62,9 +63,22 @@ jobs:
       - name: Ejecutar pruebas y generar cobertura
         run: |
           dotnet test ./PruebasUnitarias.slnx -c Release --no-build \
+          --logger "trx;LogFileName=test-results.trx" \
           --collect:"XPlat Code Coverage" \
           --results-directory ./TestResults \
           -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: Verificar reporte de cobertura
+        run: |
+          echo "Archivos de resultados encontrados:"
+          find ./TestResults -type f \( -name "coverage.opencover.xml" -o -name "*.trx" \) -print
+
+          COVERAGE_FILE=$(find ./TestResults -type f -name "coverage.opencover.xml" | head -n 1)
+          if [ -z "$COVERAGE_FILE" ]; then
+            echo "No se encontró coverage.opencover.xml."
+            exit 1
+          fi
+          echo "Reporte de cobertura detectado en: $COVERAGE_FILE"
 
       - name: Finalizar análisis SonarCloud
         if: env.SONAR_TOKEN != ''
@@ -75,5 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-results
-          path: TestResults/**/coverage.opencover.xml
+          path: |
+            TestResults/**/coverage.opencover.xml
+            TestResults/**/*.trx
           if-no-files-found: warn
