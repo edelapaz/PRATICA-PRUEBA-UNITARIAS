@@ -2,15 +2,18 @@ name: .NET CI con SonarCloud
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev_edelapaz"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   build-test-analyze:
     runs-on: ubuntu-latest
 
     env:
+      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+      SONAR_ORG: ${{ secrets.SONAR_ORG }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     steps:
@@ -43,16 +46,27 @@ jobs:
           dotnet tool update --global dotnet-sonarscanner
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
+      - name: Validar variables de SonarCloud
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "Falta SONAR_TOKEN en los secrets del repositorio."
+            exit 1
+          fi
+
+          echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
+          echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
+
       - name: Iniciar análisis SonarCloud
-        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner begin \
-          /k:"edelapaz_PRATICA-PRUEBA-UNITARIAS" \
-          /o:"edelapaz" \
+          /k:"$SONAR_PROJECT_KEY" \
+          /o:"$SONAR_ORG" \
           /d:sonar.token="$SONAR_TOKEN" \
           /d:sonar.host.url="https://sonarcloud.io" \
-          /d:sonar.cs.opencover.reportsPaths="./TestResults/**/coverage.opencover.xml" \
-          /d:sonar.cs.vstest.reportsPaths="./TestResults/**/*.trx"
+          /d:sonar.qualitygate.wait=true \
+          /d:sonar.verbose=true \
+          /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage.opencover.xml" \
+          /d:sonar.cs.vstest.reportsPaths="./TestResults/test-results.trx"
 
       - name: Restaurar dependencias
         run: dotnet restore ./PruebasUnitarias.slnx
@@ -79,9 +93,17 @@ jobs:
             exit 1
           fi
           echo "Reporte de cobertura detectado en: $COVERAGE_FILE"
+          cp "$COVERAGE_FILE" ./TestResults/coverage.opencover.xml
+
+          TRX_FILE=$(find ./TestResults -type f -name "*.trx" | head -n 1)
+          if [ -n "$TRX_FILE" ]; then
+            cp "$TRX_FILE" ./TestResults/test-results.trx
+            echo "Reporte TRX detectado en: $TRX_FILE"
+          else
+            echo "No se encontró archivo TRX."
+          fi
 
       - name: Finalizar análisis SonarCloud
-        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
