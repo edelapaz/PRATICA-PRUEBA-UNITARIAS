@@ -99,10 +99,10 @@ jobs:
             exit 1
           fi
           echo "Reporte de cobertura detectado en: $COVERAGE_FILE"
-          TARGET_COVERAGE="./TestResults/coverage.opencover.xml"
-          if [ "$COVERAGE_FILE" != "$TARGET_COVERAGE" ] && [ "$COVERAGE_FILE" != "TestResults/coverage.opencover.xml" ]; then
-            cp "$COVERAGE_FILE" "$TARGET_COVERAGE"
-          fi
+           TARGET_COVERAGE="./TestResults/coverage.opencover.xml"
+           if [ "${COVERAGE_FILE#./}" != "${TARGET_COVERAGE#./}" ]; then
+             cp "$COVERAGE_FILE" "$TARGET_COVERAGE"
+           fi
 
           TRX_FILE=$(find ./TestResults -type f -name "*.trx" | head -n 1)
           if [ -n "$TRX_FILE" ]; then
