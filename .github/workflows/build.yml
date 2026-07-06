@@ -1,4 +1,5 @@
 name: .NET CI con SonarCloud
+
 on:
   push:
     branches: ["main"]
@@ -9,8 +10,11 @@ jobs:
   build-test-analyze:
     runs-on: ubuntu-latest
 
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
     steps:
-      - name: Checkout del codigo
+      - name: Checkout del código
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -31,32 +35,41 @@ jobs:
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
 
       - name: Instalar SonarScanner
         run: |
           dotnet tool update --global dotnet-sonarscanner
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      - name: Iniciar analisis de SonarCloud
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Iniciar análisis SonarCloud
+        if: env.SONAR_TOKEN != ''
         run: |
-          dotnet sonarscanner begin /k:"edelapaz_PRATICA-PRUEBA-UNITARIAS" /o:"edelapaz" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
+          dotnet sonarscanner begin \
+          /k:"edelapaz_PRATICA-PRUEBA-UNITARIAS" \
+          /o:"edelapaz" \
+          /d:sonar.token="$SONAR_TOKEN" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
 
       - name: Restaurar dependencias
         run: dotnet restore ./PruebasUnitarias.slnx
 
-      - name: Compilar solucion
+      - name: Compilar solución
         run: dotnet build ./PruebasUnitarias.slnx -c Release --no-restore
 
       - name: Ejecutar pruebas y generar cobertura
-        run: dotnet test ./PruebasUnitarias.slnx -c Release --no-build --collect:"XPlat Code Coverage" --results-directory ./TestResults -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+        run: |
+          dotnet test ./PruebasUnitarias.slnx -c Release --no-build \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
-      - name: Finalizar analisis y enviar a SonarCloud
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+      - name: Finalizar análisis SonarCloud
+        if: env.SONAR_TOKEN != ''
+        run: |
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
       - name: Publicar reporte de cobertura
         uses: actions/upload-artifact@v4
