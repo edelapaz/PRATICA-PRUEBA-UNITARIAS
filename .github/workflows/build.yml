@@ -108,34 +108,27 @@ jobs:
         run: |
           $resultsDir = Resolve-Path "${{ env.TEST_RESULTS_DIR }}"
 
-          $coverageFile = Get-ChildItem -Path $resultsDir -Recurse -Filter "coverage.opencover.xml" |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
+          COVERAGE_FILE=$(find ./TestResults -type f -name "coverage.opencover.xml" | head -n 1)
+          if [ -z "$COVERAGE_FILE" ]; then
+            echo "No se encontró coverage.opencover.xml."
+            exit 1
+          fi
+          echo "Reporte de cobertura detectado en: $COVERAGE_FILE"
+           TARGET_COVERAGE="./TestResults/coverage.opencover.xml"
+           if [ "${COVERAGE_FILE#./}" != "${TARGET_COVERAGE#./}" ]; then
+             cp "$COVERAGE_FILE" "$TARGET_COVERAGE"
+           fi
 
-          if (-not $coverageFile) {
-            throw "No se encontró coverage.opencover.xml en $resultsDir"
-          }
-
-          $targetCoverage = Join-Path $resultsDir "coverage.opencover.xml"
-          if ($coverageFile.FullName -ne $targetCoverage) {
-            Copy-Item $coverageFile.FullName $targetCoverage -Force
-          }
-
-          $trxFile = Get-ChildItem -Path $resultsDir -Recurse -Filter "*.trx" |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-
-          if ($trxFile) {
-            $targetTrx = Join-Path $resultsDir "test-results.trx"
-            if ($trxFile.FullName -ne $targetTrx) {
-              Copy-Item $trxFile.FullName $targetTrx -Force
-            }
-          }
-
-          Write-Host "Reporte de cobertura: $targetCoverage"
-          if ($trxFile) {
-            Write-Host "Reporte TRX: $(Join-Path $resultsDir 'test-results.trx')"
-          }
+          TRX_FILE=$(find ./TestResults -type f -name "*.trx" | head -n 1)
+          if [ -n "$TRX_FILE" ]; then
+             TARGET_TRX="./TestResults/test-results.trx"
+             if [ "${TRX_FILE#./}" != "${TARGET_TRX#./}" ]; then
+               cp "$TRX_FILE" "$TARGET_TRX"
+             fi
+            echo "Reporte TRX detectado en: $TRX_FILE"
+          else
+            echo "No se encontró archivo TRX."
+          fi
 
       - name: Finalizar análisis SonarCloud
         if: ${{ steps.sonar.outputs.enabled == 'true' }}
