@@ -27,12 +27,12 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Configurar SonarCloud
+      - name: Configure SonarCloud
         id: sonar
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
             echo "enabled=false" >> $GITHUB_OUTPUT
-            echo "Se omite SonarCloud porque SONAR_TOKEN no está configurado."
+            echo "Skipping SonarCloud because SONAR_TOKEN is not configured."
             exit 0
           fi
 
