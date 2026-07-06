@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PruebasUnitarias.Api.Application;
+using PruebasUnitarias.Api.Contracts;
 using PruebasUnitarias.Api.Domain;
 
 namespace PruebasUnitarias.Api.Controllers;
@@ -28,8 +29,14 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateAsync([FromBody] User user)
+    public async Task<IActionResult> CreateAsync([FromBody] CreateUserRequest request)
     {
+        var user = new User
+        {
+            Name = request.Name,
+            Email = request.Email
+        };
+
         var createdUser = await userService.CreateAsync(user);
         return CreatedAtAction(nameof(GetByIdAsync), new { id = createdUser.Id }, createdUser);
     }

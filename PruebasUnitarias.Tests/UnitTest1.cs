@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Moq;
 using PruebasUnitarias.Api.Application;
+using PruebasUnitarias.Api.Contracts;
 using PruebasUnitarias.Api.Controllers;
 using PruebasUnitarias.Api.Domain;
 
@@ -74,7 +75,7 @@ public sealed class UsersControllerTests
     public async Task CreateAsync_CuandoDatosValidos_RetornaCreatedAtActionYLlamaServicioUnaVez()
     {
         // Arrange
-        var inputUser = new User { Name = "John", Email = "john@test.com" };
+        var inputUser = new CreateUserRequest { Name = "John", Email = "john@test.com" };
         var createdUser = new User { Id = 1, Name = "John", Email = "john@test.com" };
 
         var userServiceMock = new Mock<IUserService>();
@@ -95,7 +96,7 @@ public sealed class UsersControllerTests
     public async Task CreateAsync_CuandoEmailEsJohnTestCom_VerificaParametroConItIs()
     {
         // Arrange
-        var inputUser = new User { Name = "John", Email = "john@test.com" };
+        var inputUser = new CreateUserRequest { Name = "John", Email = "john@test.com" };
         var createdUser = new User { Id = 1, Name = "John", Email = "john@test.com" };
 
         var userServiceMock = new Mock<IUserService>();
@@ -116,7 +117,7 @@ public sealed class UsersControllerTests
     public async Task CreateAsync_CuandoSeEjecuta_CallbackCuentaUnaSolaLlamada()
     {
         // Arrange
-        var inputUser = new User { Name = "John", Email = "john@test.com" };
+        var inputUser = new CreateUserRequest { Name = "John", Email = "john@test.com" };
         var createdUser = new User { Id = 1, Name = "John", Email = "john@test.com" };
         var callCount = 0;
 
@@ -176,7 +177,7 @@ public sealed class UsersControllerTests
     {
         // Arrange
         var existingUser = new User { Id = 1, Name = "Eliazar de la paz", Email = "eliazar.delapaz@micm.gob.do" };
-        var inputUser = new User { Name = "Juan Miguel Jiménez Torres", Email = "miguel.jimenez@micm.gob.do" };
+        var inputUser = new CreateUserRequest { Name = "Juan Miguel Jiménez Torres", Email = "miguel.jimenez@micm.gob.do" };
         var createdUser = new User { Id = 2, Name = "Jabin Beriguete Medina", Email = "jabin.beriguete@micm.gob.do" };
         var allUsers = new List<User> { existingUser, createdUser };
 

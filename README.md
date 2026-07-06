@@ -58,6 +58,18 @@ dotnet build .\PruebasUnitarias.slnx
 dotnet test .\PruebasUnitarias.slnx -c Release
 ```
 
+## Ejecutar coverage local
+
+Desde la raiz del repositorio:
+
+```bash
+dotnet test .\PruebasUnitarias.slnx -c Release --collect:"XPlat Code Coverage" --results-directory .\TestResults -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+```
+
+Archivo de salida esperado:
+
+- `TestResults/**/coverage.opencover.xml`
+
 ## Ejecutar la API
 
 ```bash
