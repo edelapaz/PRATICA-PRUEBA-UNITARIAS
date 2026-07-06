@@ -106,10 +106,10 @@ jobs:
 
           TRX_FILE=$(find ./TestResults -type f -name "*.trx" | head -n 1)
           if [ -n "$TRX_FILE" ]; then
-            TARGET_TRX="./TestResults/test-results.trx"
-            if [ "$TRX_FILE" != "$TARGET_TRX" ] && [ "$TRX_FILE" != "TestResults/test-results.trx" ]; then
-              cp "$TRX_FILE" "$TARGET_TRX"
-            fi
+             TARGET_TRX="./TestResults/test-results.trx"
+             if [ "${TRX_FILE#./}" != "${TARGET_TRX#./}" ]; then
+               cp "$TRX_FILE" "$TARGET_TRX"
+             fi
             echo "Reporte TRX detectado en: $TRX_FILE"
           else
             echo "No se encontró archivo TRX."
