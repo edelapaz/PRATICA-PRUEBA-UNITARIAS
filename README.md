@@ -64,9 +64,12 @@ dotnet test .\PruebasUnitarias.slnx -c Release
 dotnet run --project .\PruebasUnitarias.Api\PruebasUnitarias.Api.csproj
 ```
 
-Endpoint principal:
+Endpoints disponibles:
 
 - `GET /api/users`
+- `GET /api/users/{id}`
+- `POST /api/users`
+- `DELETE /api/users/{id}`
 
 ## Cobertura de pruebas implementada
 
@@ -114,3 +117,12 @@ Las pruebas usan nomenclatura `Metodo_Escenario_ResultadoEsperado` y patron AAA 
 
 - `InMemoryUserService` existe para que la API compile y pueda ejecutarse sin dependencias externas.
 - El foco del repositorio esta en pruebas unitarias de controlador con dobles de prueba (`Mock<IUserService>`), no en pruebas de integracion.
+
+## Solucion de problemas
+
+- Si `dotnet build` falla con errores `MSB3027` o `MSB3021` indicando que `PruebasUnitarias.Api.exe` esta en uso, la API sigue corriendo en otra terminal.
+- Deten la API con `Ctrl + C` y vuelve a ejecutar:
+
+```bash
+dotnet build .\PruebasUnitarias.slnx
+```
