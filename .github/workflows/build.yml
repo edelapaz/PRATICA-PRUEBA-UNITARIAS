@@ -27,13 +27,28 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Configure SonarCloud
+        id: sonar
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "Skipping SonarCloud because SONAR_TOKEN is not configured."
+            exit 0
+          fi
+
+          echo "enabled=true" >> $GITHUB_OUTPUT
+          echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
+          echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
+
       - name: Setup Java 17
+        if: ${{ steps.sonar.outputs.enabled == 'true' }}
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
 
       - name: Cache SonarCloud packages
+        if: ${{ steps.sonar.outputs.enabled == 'true' }}
         uses: actions/cache@v4
         with:
           path: ~/.sonar/cache
@@ -42,20 +57,13 @@ jobs:
             ${{ runner.os }}-sonar
 
       - name: Instalar SonarScanner
+        if: ${{ steps.sonar.outputs.enabled == 'true' }}
         run: |
           dotnet tool update --global dotnet-sonarscanner
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      - name: Validar variables de SonarCloud
-        run: |
-          if [ -z "$SONAR_TOKEN" ]; then
-            echo "SONAR_TOKEN no está definido. Se omitirán los pasos de SonarCloud en este run."
-          fi
-
-          echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
-          echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
-
       - name: Iniciar análisis SonarCloud
+        if: ${{ steps.sonar.outputs.enabled == 'true' }}
         if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner begin \
@@ -109,7 +117,6 @@ jobs:
           fi
 
       - name: Finalizar análisis SonarCloud
-        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
