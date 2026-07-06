@@ -22,6 +22,7 @@ jobs:
         id: sonar
         env:
           IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+          IS_CANONICAL_REPO: ${{ github.repository == 'edelapaz/PRATICA-PRUEBA-UNITARIAS' }}
         run: |
           if [ "$IS_FORK_PR" = "true" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
@@ -30,7 +31,7 @@ jobs:
           fi
 
           if [ -z "$SONAR_TOKEN" ]; then
-            if [ "$GITHUB_REF_NAME" = "main" ] || [ "$GITHUB_REF_NAME" = "master" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$IS_CANONICAL_REPO" = "true" ] && { [ "$GITHUB_REF_NAME" = "main" ] || [ "$GITHUB_REF_NAME" = "master" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; }; then
               echo "Falta SONAR_TOKEN. Este workflow requiere SONAR_TOKEN para publicar métricas en SonarCloud."
               exit 1
             fi
@@ -74,6 +75,7 @@ jobs:
           /o:"$SONAR_ORG" \
           /d:sonar.token="$SONAR_TOKEN" \
           /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.qualitygate.wait=true \
           /d:sonar.verbose=true \
           /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage.opencover.xml" \
           /d:sonar.cs.vstest.reportsPaths="./TestResults/test-results.trx"
