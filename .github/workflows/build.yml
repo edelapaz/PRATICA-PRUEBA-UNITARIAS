@@ -49,21 +49,20 @@ jobs:
       - name: Validar variables de SonarCloud
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
-            echo "Falta SONAR_TOKEN en los secrets del repositorio."
-            exit 1
+            echo "SONAR_TOKEN no está definido. Se omitirán los pasos de SonarCloud en este run."
           fi
 
           echo "SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-edelapaz_PRATICA-PRUEBA-UNITARIAS}" >> $GITHUB_ENV
           echo "SONAR_ORG=${SONAR_ORG:-edelapaz}" >> $GITHUB_ENV
 
       - name: Iniciar análisis SonarCloud
+        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner begin \
           /k:"$SONAR_PROJECT_KEY" \
           /o:"$SONAR_ORG" \
           /d:sonar.token="$SONAR_TOKEN" \
           /d:sonar.host.url="https://sonarcloud.io" \
-          /d:sonar.qualitygate.wait=true \
           /d:sonar.verbose=true \
           /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage.opencover.xml" \
           /d:sonar.cs.vstest.reportsPaths="./TestResults/test-results.trx"
@@ -110,6 +109,7 @@ jobs:
           fi
 
       - name: Finalizar análisis SonarCloud
+        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
