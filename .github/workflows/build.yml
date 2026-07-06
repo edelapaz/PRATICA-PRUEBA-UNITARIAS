@@ -64,7 +64,6 @@ jobs:
 
       - name: Iniciar análisis SonarCloud
         if: ${{ steps.sonar.outputs.enabled == 'true' }}
-        if: env.SONAR_TOKEN != ''
         run: |
           dotnet sonarscanner begin \
           /k:"$SONAR_PROJECT_KEY" \
