@@ -10,7 +10,8 @@ public sealed class InMemoryUserService : IUserService
         new User { Id = 1, Name = "Eliazar de la paz", Email = "eliazar.delapaz@micm.gob.do" },
         new User { Id = 2, Name = "Jabin Beriguete Medina", Email = "jabin.beriguete@micm.gob.do" },
         new User { Id = 3, Name = "Juan Miguel Jiménez Torres", Email = "miguel.jimenez@micm.gob.do" },
-        new User { Id = 4, Name = "José Eduardo Díaz", Email = "jose.diaz@micm.gob.do" }
+        new User { Id = 4, Name = "José Eduardo Díaz", Email = "jose.diaz@micm.gob.do" },
+        new User { Id = 5, Name = "María Fernanda López", Email = "maria.fernandez@micm.gob.do" }
     ];
     public Task<IReadOnlyList<User>> GetAllAsync()
     {
