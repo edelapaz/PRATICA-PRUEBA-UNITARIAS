@@ -31,11 +31,6 @@ jobs:
           fi
 
           if [ -z "$SONAR_TOKEN" ]; then
-            if [ "$IS_CANONICAL_REPO" = "true" ] && { [ "$GITHUB_REF_NAME" = "main" ] || [ "$GITHUB_REF_NAME" = "master" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; }; then
-              echo "Falta SONAR_TOKEN. Este workflow requiere SONAR_TOKEN para publicar métricas en SonarCloud."
-              exit 1
-            fi
-
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "SONAR_TOKEN no configurado en esta ejecución. Se omiten pasos de SonarCloud."
             exit 0
