@@ -24,3 +24,5 @@ TestResults/
 *.nupkg
 packages/
 /.vs
+
+.fake
