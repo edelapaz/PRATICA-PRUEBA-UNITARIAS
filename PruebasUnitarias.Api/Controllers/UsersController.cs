@@ -10,7 +10,7 @@ namespace PruebasUnitarias.Api.Controllers;
 public sealed class UsersController(IUserService userService) : ControllerBase
 {
 
-    // TODO: Implement the controller methods for user management (CRUD operations) using the IUserService.
+    //Implement the controller methods for user management (CRUD operations) using the IUserService.
     [HttpGet]
     public async Task<IActionResult> GetAsync()
     {
@@ -18,8 +18,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
         return Ok(users);
     }
 
-    // TODO: Implement the GetByIdAsync method to retrieve a user by their ID.
-
+    //Implement the GetByIdAsync method to retrieve a user by their ID.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetByIdAsync(int id)
     {
@@ -31,7 +30,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
 
         return Ok(user);
     }
-    // TODO: Implement the CreateAsync method to create a new user.
+    //Implement the CreateAsync method to create a new user.
     [HttpPost]
     public async Task<IActionResult> CreateAsync([FromBody] CreateUserRequest request)
     {
@@ -44,7 +43,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
         var createdUser = await userService.CreateAsync(user);
         return CreatedAtAction(nameof(GetByIdAsync), new { id = createdUser.Id }, createdUser);
     }
-    // TODO: Implement the UpdateAsync method to update an existing user.
+    //Implement the UpdateAsync method to update an existing user.
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteAsync(int id)
     {
